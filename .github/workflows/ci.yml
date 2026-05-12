@@ -17,8 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: pip install yamllint
       - run: yamllint -d relaxed .github/workflows/
-      - run: |
-          curl -sL "$(curl -s https://api.github.com/repos/rhysd/actionlint/releases/latest | grep browser_download_url | grep linux_amd64.tar.gz | cut -d '"' -f 4)" | tar xz
+      - run: bash <(curl -s https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
       - run: ./actionlint
       - run: echo "All workflow files are valid."
 
