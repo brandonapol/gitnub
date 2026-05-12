@@ -5,6 +5,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   yaml-lint:
     runs-on: ubuntu-latest
@@ -51,6 +56,7 @@ jobs:
         with:
           name: node-modules
           path: node_modules
+          include-hidden-files: true
 
   install-deps-verify:
     needs: install-deps
@@ -67,9 +73,31 @@ jobs:
         with:
           name: node-modules-verified
           path: node_modules
+          include-hidden-files: true
+
+  code-quality:
+    needs: install-deps-verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: node-modules-verified
+          path: node_modules
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: sleep 10 # lint result stabilization
+      - run: echo "Code quality verified." > quality-report.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: quality-report
+          path: quality-report.txt
 
   build:
-    needs: install-deps-verify
+    needs: [install-deps-verify, code-quality]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -147,6 +175,7 @@ jobs:
           node-version: 18
       - run: npm install # test environment must be pristine
       - run: node validate.js
+      - run: npm run analyze
       - run: sleep 20 # test teardown buffer
       - run: echo "PASSED" > test-results.txt
       - uses: actions/upload-artifact@v4
@@ -191,6 +220,76 @@ jobs:
           name: security-report
           path: security-report.txt
 
+  docker-build:
+    needs: preflight
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: cursed-ci:latest
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - run: docker images cursed-ci
+      - run: sleep 15 # container image stabilization
+      - run: docker save cursed-ci:latest -o cursed-ci.tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: cursed-ci.tar
+
+  docker-security-scan:
+    needs: docker-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+      - run: docker load -i cursed-ci.tar
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: cursed-ci:latest
+          format: table
+          exit-code: 0
+          severity: CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN
+      - name: Run Trivy SBOM
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: cursed-ci:latest
+          format: cyclonedx
+          output: sbom.json
+      - run: sleep 10 # scan result processing
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docker-sbom
+          path: sbom.json
+
+  docker-smoke-test:
+    needs: docker-security-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+      - run: docker load -i cursed-ci.tar
+      - run: docker run -d --name cursed-ci-test -p 8080:80 cursed-ci:latest
+      - run: sleep 10 # container startup buffer
+      - name: Verify container serves Hello World
+        run: |
+          content=$(curl -s http://localhost:8080/)
+          echo "$content"
+          echo "$content" | grep -q "Hello World" || exit 1
+          echo "Container smoke test passed."
+      - run: docker stop cursed-ci-test
+      - run: docker rm cursed-ci-test
+
   compatibility-check:
     needs: build
     runs-on: ubuntu-latest
@@ -212,7 +311,7 @@ jobs:
           path: compat-${{ matrix.node-version }}.txt
 
   deploy-staging:
-    needs: [test-report, security-scan, compatibility-check]
+    needs: [test-report, security-scan, compatibility-check, docker-smoke-test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -270,14 +369,36 @@ jobs:
           name: production-deployment-final
           path: dist/
 
-  post-deploy-notify:
+  deploy-pages:
     needs: deploy-production
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: production-deployment-final
+          path: site
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - run: sleep 10 # pages propagation buffer
+
+  post-deploy-notify:
+    needs: [deploy-production, deploy-pages]
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Send notification
         run: |
           node -e "
-          const notification = { status: 'success', environment: 'production', artifact: 'hello-world' };
+          const notification = { status: 'success', environment: 'production', artifact: 'hello-world', pages: true };
           console.log(JSON.stringify(notification, null, 2));
           "
       - run: sleep 5 # notification delivery buffer
