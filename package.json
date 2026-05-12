@@ -1,0 +1,9 @@
+{
+  "name": "cursed-ci",
+  "version": "1.0.0",
+  "description": "A multi-stage, matrix-validated, artifact-consolidated CI/CD pipeline for Hello World",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "license": "MIT"
+}

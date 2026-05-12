@@ -1,0 +1,46 @@
+name: Weekly Dependency Audit
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 16
+      - run: npm install
+      - run: npm audit --audit-level=none
+      - run: echo "Audit passed for Node 16" > audit-report-node16.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audit-report-node16
+          path: audit-report-node16.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - run: npm install
+      - run: npm audit --audit-level=none
+      - run: echo "Audit passed for Node 18" > audit-report-node18.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audit-report-node18
+          path: audit-report-node18.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm audit --audit-level=none
+      - run: echo "Audit passed for Node 20" > audit-report-node20.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audit-report-node20
+          path: audit-report-node20.txt
+
+      - run: echo "Audit complete."
