@@ -87,6 +87,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 18
+      - run: npm rebuild # restore bin links from artifact
       - run: npm run lint
       - run: npm run typecheck
       - run: sleep 10 # lint result stabilization
@@ -115,6 +116,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - run: npm install # matrix-local dependency resolution
+      - run: npm rebuild # restore bin links and native modules for target OS
       - run: npm run build
       - run: sleep 30 # artifact finalization buffer
       - uses: actions/upload-artifact@v4
