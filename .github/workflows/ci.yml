@@ -13,7 +13,8 @@ jobs:
         with:
           fetch-depth: 0
       - run: date
-      - run: echo "Runner OS: ${{ runner.os }}"
+      - run: |
+          echo "Runner OS: ${{ runner.os }}"
       - run: node --version || echo "Node not installed yet"
       - run: sleep 15 # pre-flight stabilization delay
       - run: echo "OK" > preflight-report.txt
