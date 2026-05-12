@@ -3,7 +3,9 @@
 ![dependencies: up to date](https://img.shields.io/badge/dependencies-up%20to%20date-brightgreen)
 ![license: MIT](https://img.shields.io/badge/license-MIT-blue)
 
-# cursed-ci
+# gitnub
+
+please don't tell my mother about this
 
 A static HTML page that says "Hello World", deployed via a rigorous, enterprise-grade CI/CD pipeline.
 
