@@ -7,7 +7,7 @@
 
 A static HTML page that says "Hello World", deployed via a rigorous, enterprise-grade CI/CD pipeline.
 
-![Legal Review](Screenshot%202026-05-11%20at%208.12.42%20PM.png)
+![Legal Review](Screenshot%202026-05-11%20at%208.12.42%E2%80%AFPM.png)
 
 ## Architecture
 
