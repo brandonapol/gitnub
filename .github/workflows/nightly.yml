@@ -19,7 +19,7 @@ jobs:
       - run: node validate.js
       - run: sleep 60 # nightly stability soak
       - name: Upload nightly artifact
-        run: echo "ARTIFACT_NAME=nightly-regression-$(date +%s)" >> $GITHUB_ENV
+        run: echo "ARTIFACT_NAME=nightly-regression-$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}
